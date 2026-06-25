@@ -1,0 +1,168 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../prisma/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ArtifactStatus {
+  DRAFT
+  AVAILABLE
+  RESERVED
+  SOLD
+  ARCHIVED
+}
+
+enum EventType {
+  CREATED
+  CATALOGED
+  PHOTOGRAPHED
+  LISTED
+  RESERVED
+  SOLD
+  TRANSFERRED
+  SHIPPED
+  RESTORED
+  ARCHIVED
+}
+
+model Creator {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  bio       String?
+  createdAt DateTime @default(now())
+
+  artifacts Artifact[]
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  artifacts Artifact[]
+}
+
+model Artifact {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  editionNo   String?        @unique
+  title       String
+  description String?
+  status      ArtifactStatus @default(DRAFT)
+
+  creatorId String
+  creator   Creator @relation(fields: [creatorId], references: [id])
+
+  collectionId String?
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+
+  materials  ArtifactMaterial[]
+  images     ArtifactImage[]
+  events     ProvenanceEvent[]
+  ownerships OwnershipRecord[]
+
+  priceCents Int?
+  currency   String? @default("USD")
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  certificate Certificate?
+}
+
+model Material {
+  id    String  @id @default(cuid())
+  name  String  @unique
+  notes String?
+
+  artifacts ArtifactMaterial[]
+}
+
+model ArtifactMaterial {
+  artifactId String
+  materialId String
+
+  artifact Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@id([artifactId, materialId])
+}
+
+model ArtifactImage {
+  id         String   @id @default(cuid())
+  artifactId String
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  url       String
+  altText   String?
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model ProvenanceEvent {
+  id         String   @id @default(cuid())
+  artifactId String
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  type       EventType
+  title      String
+  notes      String?
+  occurredAt DateTime  @default(now())
+
+  location  String?
+  actorName String?
+
+  createdAt DateTime @default(now())
+
+  @@index([artifactId, occurredAt])
+}
+
+model Owner {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?
+  createdAt DateTime @default(now())
+
+  ownerships OwnershipRecord[]
+}
+
+model OwnershipRecord {
+  id String @id @default(cuid())
+
+  artifactId String
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  ownerId String
+  owner   Owner  @relation(fields: [ownerId], references: [id])
+
+  acquiredAt DateTime  @default(now())
+  releasedAt DateTime?
+
+  acquisitionMethod String?
+  notes             String?
+
+  @@index([artifactId])
+  @@index([ownerId])
+}
+
+model Certificate {
+  id         String @id @default(cuid())
+  artifactId String @unique
+
+  publicCode String   @unique
+  statement  String?
+  issuedAt   DateTime @default(now())
+
+  artifact Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+}
